@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="町内会・自治体チャット">
+<title>町内会・自治体チャットボット</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --header-h: 60px;
+    --template-h: 56px;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  body {
+    font-family: -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: #EEF2F0;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .header {
+    height: var(--header-h);
+    background: linear-gradient(135deg, #5B7C7E 0%, #7A9B9E 50%, #99B8B8 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    padding-top: env(safe-area-inset-top, 0px);
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(91,124,126,0.3);
+  }
+  .header-title { color: white; font-size: 16px; font-weight: 600; letter-spacing: 0.03em; }
+  .header-sub { color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 2px; }
+  .header-left { flex: 1; }
+  .header-actions { display: flex; gap: 8px; align-items: center; }
+  .btn-icon {
+    background: rgba(255,255,255,0.22); border: none; color: white;
+    font-size: 13px; padding: 6px 12px; border-radius: 20px; cursor: pointer;
+    white-space: nowrap; transition: background 0.2s;
+  }
+  .btn-icon:hover { background: rgba(255,255,255,0.35); }
+  .status-bar {
+    background: #F0F5F4; border-bottom: 1px solid #D0DEDD;
+    padding: 6px 16px; font-size: 11px; color: #5B7C7E;
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4CAF50; flex-shrink: 0; }
+  .status-dot.loading { background: #FF9800; animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .template-wrap {
+    height: var(--template-h); background: white;
+    border-bottom: 1px solid #D8E8E6;
+    display: flex; align-items: center; padding: 0 12px; gap: 8px;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; flex-shrink: 0;
+  }
+  .template-wrap::-webkit-scrollbar { display: none; }
+  .template-btn {
+    white-space: nowrap; background: #EEF5F4;
+    border: 1.5px solid #A8C8C8; color: #5B7C7E;
+    font-size: 13px; padding: 7px 14px; border-radius: 20px;
+    cursor: pointer; flex-shrink: 0; transition: all 0.18s; font-family: inherit;
+  }
+  .template-btn:hover { background: #5B7C7E; color: white; border-color: #5B7C7E; }
+  .template-btn:active { transform: scale(0.96); }
+  .chat-area {
+    flex: 1; overflow-y: auto; padding: 16px 12px;
+    display: flex; flex-direction: column; gap: 12px;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  .msg-row { display: flex; align-items: flex-start; gap: 8px; animation: fadeIn 0.25s ease forwards; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .msg-row.user { flex-direction: row-reverse; }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, #5B7C7E, #99B8B8);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0; margin-top: 2px;
+  }
+  .bubble {
+    max-width: 72%; padding: 12px 16px; border-radius: 18px;
+    font-size: 16px; line-height: 1.8; word-break: break-word;
+  }
+  .bubble.bot {
+    background: white; color: #1A2E2E;
+    border-radius: 4px 18px 18px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .bubble.user {
+    background: linear-gradient(135deg, #5B7C7E, #7A9B9E);
+    color: white; border-radius: 18px 4px 18px 18px;
+  }
+  .bubble.error { background: #FFF0F0; color: #C0392B; border: 1px solid #FFCCCC; font-size: 16px; }
+  .typing-indicator { display: flex; gap: 4px; align-items: center; padding: 12px 16px; }
+  .typing-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: #A8C8C8;
+    animation: bounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.18s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.36s; }
+  @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-6px)} }
+  .date-divider { text-align: center; font-size: 12px; color: #8AA8A8; padding: 4px 0; }
+  .input-area {
+    background: white; border-top: 1px solid #D8E8E6;
+    padding: 10px 12px; padding-bottom: calc(10px + var(--safe-bottom));
+    display: flex; align-items: flex-end; gap: 8px; flex-shrink: 0;
+  }
+  .input-box {
+    flex: 1; min-height: 44px; max-height: 120px;
+    background: #F4F8F7; border: 1.5px solid #C8E0DE; border-radius: 22px;
+    padding: 12px 16px; font-size: 16px; font-family: inherit; color: #1A2E2E;
+    resize: none; outline: none; overflow-y: auto; line-height: 1.5; transition: border-color 0.2s;
+  }
+  .input-box:focus { border-color: #5B7C7E; }
+  .input-box::placeholder { color: #90B0B0; }
+  .send-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, #5B7C7E, #7A9B9E);
+    border: none; color: white; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  .send-btn:hover { transform: scale(1.06); }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <div class="header-title">🏘️ 高木瀬町内会 お知らせボット</div>
+    <div class="header-sub">AIチャットボット</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-icon" id="btn-update" onclick="updateData()">🔄 更新</button>
+    <button class="btn-icon" onclick="resetChat()">💬 リセット</button>
+  </div>
+</div>
+<div class="status-bar" id="status-bar">
+  <div class="status-dot" id="status-dot"></div>
+  <span id="status-text">📄 読み込み中...</span>
+</div>
+<div class="template-wrap">
+  <button class="template-btn" onclick="sendTemplate('ゴミの出し方を教えてください')">ゴミの出し方</button>
+  <button class="template-btn" onclick="sendTemplate('町内会費について教えてください')">町内会費</button>
+  <button class="template-btn" onclick="sendTemplate('役員の連絡先を教えてください')">役員・連絡先</button>
+  <button class="template-btn" onclick="sendTemplate('行事・イベントの予定を教えてください')">行事・イベント</button>
+  <button class="template-btn" onclick="sendTemplate('町内会館の使い方を教えてください')">町内会館</button>
+  <button class="template-btn" onclick="sendTemplate('災害時の対応を教えてください')">災害時の対応</button>
+  <button class="template-btn" onclick="sendTemplate('新しく引越してきました。何をしたらいいですか？')">引越し・入会</button>
+</div>
+<div class="chat-area" id="chat-area">
+  <div class="date-divider" id="today-label"></div>
+</div>
+<div class="input-area">
+  <textarea class="input-box" id="input-box" placeholder="ご質問をどうぞ..." rows="1"
+    onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+  <button class="send-btn" id="send-btn" onclick="sendMessage()" disabled>➤</button>
+</div>
+<script>
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbzygLyREdsukEl1Y4mu75JmAHUhF3GOPt5cms-iPsvc53bCjBInLp0YHNAnck4qN1hmyA/exec';
+
+const STORAGE_KEY_DOC  = 'community_doc_content';
+const STORAGE_KEY_CHAT = 'community_chat_history';
+const STORAGE_KEY_DATE = 'community_last_updated';
+
+let docContent = '';
+let chatHistory = [];
+let isLoading = false;
+
+window.addEventListener('load', () => {
+  setTodayLabel();
+  loadFromStorage();
+  showGreeting();
+  document.getElementById('input-box').addEventListener('input', () => {
+    const val = document.getElementById('input-box').value.trim();
+    document.getElementById('send-btn').disabled = val.length === 0 || isLoading;
+  });
+});
+
+function setTodayLabel() {
+  const now = new Date();
+  document.getElementById('today-label').textContent =
+    `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日`;
+}
+
+function loadFromStorage() {
+  const saved = localStorage.getItem(STORAGE_KEY_DOC);
+  const savedDate = localStorage.getItem(STORAGE_KEY_DATE);
+  if (saved) {
+    docContent = saved;
+    setStatus(true, `データ読み込み済み${savedDate ? '（' + savedDate + ' 時点）' : ''}`);
+  } else {
+    fetchDocFromGAS();
+  }
+}
+
+async function fetchDocFromGAS() {
+  setStatus(false, 'データを取得中...');
+  document.getElementById('btn-update').disabled = true;
+  try {
+    const res = await fetch(GAS_URL + '?action=getDoc');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (!text || text.startsWith('データの読み込みに失敗')) throw new Error(text);
+    docContent = text;
+    const now = new Date();
+    const dateStr = `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+    localStorage.setItem(STORAGE_KEY_DOC, docContent);
+    localStorage.setItem(STORAGE_KEY_DATE, dateStr);
+    setStatus(true, `最新データを取得しました（${dateStr}）`);
+  } catch (e) {
+    setStatus(false, 'データ取得に失敗しました。しばらくしてから🔄更新を押してください。');
+  } finally {
+    document.getElementById('btn-update').disabled = false;
+  }
+}
+
+function updateData() {
+  localStorage.removeItem(STORAGE_KEY_DOC);
+  localStorage.removeItem(STORAGE_KEY_DATE);
+  fetchDocFromGAS();
+}
+
+function setStatus(ok, text) {
+  document.getElementById('status-dot').className = 'status-dot' + (ok ? '' : ' loading');
+  document.getElementById('status-text').textContent = text;
+}
+
+function showGreeting() {
+  const saved = localStorage.getItem(STORAGE_KEY_CHAT);
+  if (saved) {
+    chatHistory = JSON.parse(saved);
+    chatHistory.forEach(msg => appendBubble(msg.role === 'user' ? 'user' : 'bot', msg.content));
+  } else {
+    appendBubble('bot', 'こんにちは！高木瀬町内会のお知らせボットです🏘️\n町内会のルール・行事・役員の連絡先など、\nなんでもお気軽にご質問ください😊');
+  }
+  scrollToBottom();
+}
+
+function resetChat() {
+  if (!confirm('会話をリセットしますか？')) return;
+  chatHistory = [];
+  localStorage.removeItem(STORAGE_KEY_CHAT);
+  const chatArea = document.getElementById('chat-area');
+  chatArea.innerHTML = '<div class="date-divider" id="today-label"></div>';
+  setTodayLabel();
+  showGreeting();
+}
+
+function sendTemplate(text) {
+  document.getElementById('input-box').value = text;
+  autoResize(document.getElementById('input-box'));
+  sendMessage();
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+async function sendMessage() {
+  const inputBox = document.getElementById('input-box');
+  const text = inputBox.value.trim();
+  if (!text || isLoading) return;
+  inputBox.value = '';
+  autoResize(inputBox);
+  document.getElementById('send-btn').disabled = true;
+
+  appendBubble('user', text);
+  chatHistory.push({ role: 'user', content: text });
+
+  // ユーザーメッセージを画面上部に表示
+  scrollToMessage('last-user');
+
+  const typingId = showTyping();
+  isLoading = true;
+
+  try {
+    const reply = await callGAS();
+    hideTyping(typingId);
+    appendBubble('bot', reply);
+    chatHistory.push({ role: 'assistant', content: reply });
+    if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
+    localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(chatHistory));
+
+    // ボット返答後もユーザーメッセージが上部に見える位置を維持
+    scrollToMessage('last-user');
+
+  } catch (e) {
+    hideTyping(typingId);
+    appendBubble('error', 'エラーが発生しました。しばらくしてから再度お試しください。\n' + e.message);
+    scrollToBottom();
+  } finally {
+    isLoading = false;
+  }
+}
+
+function scrollToMessage(target) {
+  const chatArea = document.getElementById('chat-area');
+  if (target === 'last-user') {
+    // ユーザーメッセージ（.msg-row.user）の最後のものを取得
+    const userMessages = chatArea.querySelectorAll('.msg-row.user');
+    if (userMessages.length > 0) {
+      const lastUserMsg = userMessages[userMessages.length - 1];
+      // ユーザーメッセージの上端がチャットエリアの上部に来るようにスクロール
+      const msgTop = lastUserMsg.offsetTop - chatArea.offsetTop;
+      chatArea.scrollTo({ top: msgTop - 16, behavior: 'smooth' });
+    }
+  }
+}
+
+async function callGAS() {
+  const response = await fetch(GAS_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({
+      action: 'chat',
+      messages: chatHistory.slice(-20),
+      docContent: docContent
+    })
+  });
+  if (!response.ok) throw new Error(`GASエラー (${response.status})`);
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  return data.reply;
+}
+
+function appendBubble(type, text) {
+  const chatArea = document.getElementById('chat-area');
+  const row = document.createElement('div');
+  row.className = 'msg-row' + (type === 'user' ? ' user' : '');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble ' + (type === 'error' ? 'error' : type === 'user' ? 'user' : 'bot');
+  bubble.innerHTML = cleanMarkdown(text).replace(/\n/g, '<br>');
+  if (type !== 'user') {
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = '🏘️';
+    row.appendChild(avatar);
+  }
+  row.appendChild(bubble);
+  chatArea.appendChild(row);
+}
+
+function cleanMarkdown(text) {
+  return text
+    .replace(/#{1,6}\s/g, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`{1,3}(.+?)`{1,3}/g, '$1')
+    .replace(/^\s*[-*+]\s/gm, '・')
+    .replace(/^\s*\d+\.\s/gm, '・')
+    .trim();
+}
+
+function showTyping() {
+  const chatArea = document.getElementById('chat-area');
+  const row = document.createElement('div');
+  row.className = 'msg-row';
+  const id = 'typing-' + Date.now();
+  row.id = id;
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  avatar.textContent = '🏘️';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble bot';
+  bubble.innerHTML = '<div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>';
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  chatArea.appendChild(row);
+  scrollToBottom();
+  return id;
+}
+
+function hideTyping(id) { const el = document.getElementById(id); if (el) el.remove(); }
+function scrollToBottom() { const c = document.getElementById('chat-area'); c.scrollTop = c.scrollHeight; }
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  document.getElementById('send-btn').disabled = el.value.trim().length === 0 || isLoading;
+}
+</script>
+</body>
+</html>
