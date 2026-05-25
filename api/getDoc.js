@@ -1,50 +1,42 @@
-/**
- * 町内会・自治体向けチャットボット
- * Vercel Serverless Function - Get Document API
- *
- * 環境変数（Vercelの管理画面で設定）：
- * GAS_URL: GASのデプロイURL
- */
+// api/getDoc.js
+// Google DocsのデータをGAS経由で取得するサーバーレス関数
 
 export default async function handler(req, res) {
-  // CORSヘッダー設定
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  // OPTIONSリクエスト（プリフライト）への対応
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+  if (req.method !== 'GET') {
+    return res.status(405).send('Method not allowed');
   }
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  const gasUrl = process.env.GAS_URL;
+
+  if (!gasUrl) {
+    // GAS_URLが未設定の場合はダミーデータをテキストで返す
+    return res.status(200).send(`【テスト用サンプルデータ】
+
+空き家相談窓口：佐賀市建築指導課
+電話：0952-40-7113
+受付時間：平日8:30〜17:15
+
+【空き家バンク】
+空き家の売却・賃貸を希望する場合は空き家バンクに登録できます。
+登録は無料です。
+
+【補助金】
+・空き家解体補助金：上限50万円
+・空き家リフォーム補助金：上限100万円（要件あり）
+
+※このデータはテスト用サンプルです。`);
   }
 
   try {
-    const gasUrl = process.env.GAS_URL;
-    if (!gasUrl) {
-      return res.status(500).json({ error: 'GAS_URLが設定されていません' });
-    }
-
     const response = await fetch(`${gasUrl}?action=getDoc`);
-
-    if (!response.ok) {
-      return res.status(response.status).json({
-        error: `GASへのアクセスに失敗しました (${response.status})`
-      });
+    const data = await response.json();
+    // GASからのレスポンスをテキストとして返す
+    const content = data.content || data.text || '';
+    if (!content) {
+      return res.status(500).send('データの読み込みに失敗しました');
     }
-
-    const text = await response.text();
-
-    if (!text || text.startsWith('データの読み込みに失敗')) {
-      return res.status(500).json({ error: text || 'データの取得に失敗しました' });
-    }
-
-    return res.status(200).send(text);
-
-  } catch (err) {
-    console.error('getDoc.js error:', err);
-    return res.status(500).json({ error: err.message || '予期しないエラーが発生しました' });
+    return res.status(200).send(content);
+  } catch (e) {
+    return res.status(500).send('データの読み込みに失敗しました：' + e.message);
   }
 }
