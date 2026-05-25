@@ -304,7 +304,7 @@ async function callChatAPI() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      messages: chatHistory.slice(-20),
+      messages: chatHistory.slice(-10),
       docContent: docContent
     })
   });
