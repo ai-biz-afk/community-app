@@ -9,7 +9,6 @@ export default async function handler(req, res) {
   const gasUrl = process.env.GAS_URL;
 
   if (!gasUrl) {
-    // GAS_URLが未設定の場合はダミーデータをテキストで返す
     return res.status(200).send(`【テスト用サンプルデータ】
 
 空き家相談窓口：佐賀市建築指導課
@@ -29,10 +28,9 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(`${gasUrl}?action=getDoc`);
-    const data = await response.json();
-    // GASからのレスポンスをテキストとして返す
-    const content = data.content || data.text || '';
-    if (!content) {
+    // GASはテキストをそのまま返すので .text() で受け取る
+    const content = await response.text();
+    if (!content || content.startsWith('データの読み込みに失敗')) {
       return res.status(500).send('データの読み込みに失敗しました');
     }
     return res.status(200).send(content);
