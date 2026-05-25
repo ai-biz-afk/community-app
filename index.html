@@ -284,7 +284,7 @@ async function sendMessage() {
     hideTyping(typingId);
     appendBubble('bot', reply);
     chatHistory.push({ role: 'assistant', content: reply });
-    if (chatHistory.length > 40) chatHistory = chatHistory.slice(-40);
+    if (chatHistory.length > 20) chatHistory = chatHistory.slice(-20);
     localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(chatHistory));
 
     // ボット返答後もユーザーメッセージが上部に見える位置を維持
